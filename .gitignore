@@ -16,8 +16,6 @@ wheels/
 test.db
 *.db
 
-# Claude Code local tooling
-.claude/
 
 # IDE
 .idea/
