@@ -1,0 +1,325 @@
+:root {
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --text: #1a1a1a;
+    --text-muted: #6b7280;
+    --border: #e5e7eb;
+    --primary: #6d5efc;
+    --primary-hover: #5a4ce0;
+    --danger: #e34850;
+    --danger-bg: #fdecec;
+    --shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+    --radius: 14px;
+    color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg: #111214;
+        --surface: #1b1c1f;
+        --text: #f2f2f3;
+        --text-muted: #9a9ba1;
+        --border: #2c2d31;
+        --primary: #8677ff;
+        --primary-hover: #9a8dff;
+        --danger: #ff6b72;
+        --danger-bg: #3a1f21;
+        --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.4);
+    }
+}
+
+* { box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    min-height: 100vh;
+}
+
+main {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: 24px 16px 64px;
+}
+
+/* Topbar */
+
+#topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 24px;
+    background: color-mix(in srgb, var(--surface) 85%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.brand-icon { font-size: 1.3rem; }
+
+#userBox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#userBox.hidden { display: none; }
+
+.avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+#whoami {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Cards */
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+}
+
+.auth-card { max-width: 380px; margin: 40px auto 0; }
+
+.upload-card { margin-bottom: 24px; }
+
+.upload-card h3 {
+    margin: 0 0 14px;
+    font-size: 1rem;
+}
+
+/* Tabs */
+
+.tabs {
+    display: flex;
+    background: var(--bg);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 20px;
+}
+
+.tab {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 9px 0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tab.active {
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.auth-heading {
+    margin: 0 0 18px;
+    font-size: 1.1rem;
+}
+
+/* Form elements */
+
+label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+}
+
+input, textarea {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    margin-top: 6px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-family: inherit;
+}
+
+input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+
+textarea {
+    min-height: 70px;
+    resize: vertical;
+    margin-bottom: 14px;
+}
+
+/* Buttons */
+
+.btn {
+    border: none;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.btn:active { transform: scale(0.98); }
+
+.btn-block { width: 100%; }
+
+.btn-primary {
+    background: var(--primary);
+    color: #fff;
+}
+
+.btn-primary:hover { background: var(--primary-hover); }
+
+.btn-ghost {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+}
+
+.btn-ghost:hover { color: var(--text); border-color: var(--text-muted); }
+
+.btn-danger {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
+.btn-danger:hover { background: var(--danger); color: #fff; }
+
+/* File input */
+
+.file-drop {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 84px;
+    border: 1.5px dashed var(--border);
+    border-radius: 10px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    cursor: pointer;
+    margin-bottom: 12px;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.file-drop:hover { border-color: var(--primary); color: var(--primary); }
+
+.file-drop input { display: none; }
+
+/* Error text */
+
+.error {
+    color: var(--danger);
+    font-size: 0.85rem;
+    min-height: 1.1em;
+    margin: 10px 0 0;
+}
+
+/* Feed */
+
+.feed {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.feed-empty {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 40px 0;
+    font-size: 0.9rem;
+}
+
+.post {
+    padding: 0;
+    overflow: hidden;
+}
+
+.post .media-wrap {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: var(--bg);
+    overflow: hidden;
+}
+
+.post img, .post video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.post .post-body {
+    padding: 14px 16px;
+}
+
+.post .caption {
+    margin: 0 0 10px;
+    font-size: 0.92rem;
+    line-height: 1.4;
+}
+
+.post .meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.post .meta-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.post .delete-btn {
+    padding: 5px 12px;
+    font-size: 0.78rem;
+}
+
+/* Utility */
+
+.hidden { display: none !important; }

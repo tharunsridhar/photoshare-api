@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhotoShare</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header id="topbar">
+    <div class="brand">
+        <span class="brand-icon">📷</span>
+        <span class="brand-name">PhotoShare</span>
+    </div>
+    <div id="userBox" class="hidden">
+        <span id="whoamiAvatar" class="avatar"></span>
+        <span id="whoami"></span>
+        <button id="logoutBtn" class="btn btn-ghost">Log out</button>
+    </div>
+</header>
+
+<main>
+<div id="authView">
+    <div class="card auth-card">
+        <div class="tabs">
+            <button id="tabLoginBtn" class="tab active">Log in</button>
+            <button id="tabRegisterBtn" class="tab">Register</button>
+        </div>
+
+        <div id="loginTab">
+            <h2 class="auth-heading">Welcome back</h2>
+            <label>Email
+                <input id="loginEmail" type="email" placeholder="you@example.com">
+            </label>
+            <label>Password
+                <input id="loginPassword" type="password" placeholder="••••••••">
+            </label>
+            <button id="loginBtn" class="btn btn-primary btn-block">Log in</button>
+            <p class="error" id="loginError"></p>
+        </div>
+
+        <div id="registerTab" class="hidden">
+            <h2 class="auth-heading">Create your account</h2>
+            <label>Email
+                <input id="registerEmail" type="email" placeholder="you@example.com">
+            </label>
+            <label>Password
+                <input id="registerPassword" type="password" placeholder="At least 8 characters">
+            </label>
+            <button id="registerBtn" class="btn btn-primary btn-block">Create account</button>
+            <p class="error" id="registerError"></p>
+        </div>
+    </div>
+</div>
+
+<div id="appView" class="hidden">
+    <div class="card upload-card">
+        <h3>New post</h3>
+        <label class="file-drop" id="fileDropLabel">
+            <input id="fileInput" type="file" accept="image/*,video/*">
+            <span id="fileDropText">Choose an image or video</span>
+        </label>
+        <textarea id="captionInput" placeholder="Write a caption..."></textarea>
+        <button id="uploadBtn" class="btn btn-primary btn-block">Share</button>
+        <p class="error" id="uploadError"></p>
+    </div>
+
+    <div id="feed" class="feed"></div>
+</div>
+</main>
+
+<script src="/script.js"></script>
+</body>
+</html>
