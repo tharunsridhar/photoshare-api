@@ -2,7 +2,7 @@
 name = "photoshare-django"
 version = "0.1.0"
 description = "Django/DRF port of PhotoShare"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"  # Django 5.0 doesn't officially support 3.13+
 dependencies = [
     "celery>=5.4",
     "dj-database-url>=2.2",

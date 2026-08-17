@@ -51,11 +51,19 @@ class UploadView(APIView):
             return Response({"detail": "caption is required"}, status=status.HTTP_400_BAD_REQUEST)
         caption = request.data["caption"]
 
-        upload_result = imagekit.upload_file(
-            file=file_obj,
-            file_name=file_obj.name,
-            options=UploadFileRequestOptions(use_unique_file_name=True, tags=["backend-upload"]),
-        )
+        # ImageKit's client is a plain network call - matching the FastAPI
+        # port's broad except-and-500 around this same call, since a
+        # transport-level failure here shouldn't surface as an unhandled
+        # 500 with a stack trace leaking into the response.
+        try:
+            upload_result = imagekit.upload_file(
+                file=file_obj,
+                file_name=file_obj.name,
+                options=UploadFileRequestOptions(use_unique_file_name=True, tags=["backend-upload"]),
+            )
+        except Exception as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         if upload_result.response_metadata.http_status_code != 200:
             return Response({"detail": "Media upload failed"}, status=status.HTTP_502_BAD_GATEWAY)
 
