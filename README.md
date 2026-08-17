@@ -105,6 +105,14 @@ startup — fine for a throwaway SQLite file, no upgrade path for a real databas
 migration was generated against the actual installed `fastapi-users` schema (not hand-typed), specifically
 to avoid guessing at a third-party library's column types.
 
+**Same-origin frontend, not "CORS elimination."** The frontend is served same-origin via FastAPI's
+`StaticFiles`, so the demo's own UI never triggers a CORS preflight. Worth stating precisely: this
+doesn't eliminate CORS as a concern — the `CORS + TrustedHost middleware` in the architecture diagram is
+still there and still required for any other client (a separate frontend deployment, a mobile app, `/docs`
+hitting the API from a different origin) to call this API at all. What same-origin serving actually buys
+is avoiding an entire class of cross-origin config/misconfiguration risk *for this specific deployment
+shape* — not a reduction in CORS overhead generally.
+
 ---
 
 ## Quickstart
