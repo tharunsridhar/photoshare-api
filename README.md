@@ -1,15 +1,15 @@
-# PhotoShare API
+# PhotoShare
 
-![Python](https://img.shields.io/badge/Python-3.14-3776AB?style=flat-square&logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-App-009688?style=flat-square&logo=fastapi&logoColor=white)
-![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-Async-D71F00?style=flat-square)
-![Auth](https://img.shields.io/badge/Auth-JWT-000000?style=flat-square&logo=jsonwebtokens&logoColor=white)
-![ImageKit](https://img.shields.io/badge/Media-ImageKit-FF6B6B?style=flat-square)
-![Status](https://img.shields.io/badge/Status-Complete-1E88E5?style=flat-square)
+![CI](https://github.com/tharunsridhar/photoshare-api/actions/workflows/ci.yml/badge.svg)
 
-A photo/video sharing backend built with FastAPI — JWT authentication, async SQLAlchemy relational modeling, third-party media storage via ImageKit, and a same-origin vanilla JS frontend.
+A photo/video sharing backend: JWT authentication, async SQLAlchemy relational modeling, third-party
+media storage via ImageKit, and a same-origin vanilla JS frontend.
 
-Users register, log in, upload images or videos with a caption, and browse a shared feed. Each post is tied to its owner — only the uploader can delete it.
+Users register, log in, upload images or videos with a caption, and browse a shared feed. Each post is
+tied to its owner — only the uploader can delete it.
+
+🔗 **Live demo:** _not deployed yet — see [Deployment](#deployment) for the Railway steps, then replace this line with the live URL_
+📘 **API docs:** `<your-domain>/docs` (Swagger UI, generated from the code below)
 
 ---
 
@@ -28,81 +28,158 @@ Users register, log in, upload images or videos with a caption, and browse a sha
 
 ---
 
-## Features
+## Architecture
 
-- Email/password authentication with JWT (register, login, logout)
-- Email verification and forgot/reset-password flows
-- Image and video upload, stored via the ImageKit API
-- Shared feed of all posts, newest first, with per-post ownership flags
-- Owners can delete their own posts; everyone else gets a `403`
-- Single FastAPI process serves both the REST API and the frontend — no separate server, no CORS
+```mermaid
+flowchart LR
+    subgraph Client
+        FE["Frontend<br/>HTML/CSS/JS (same-origin)"]
+        SW["Swagger UI /docs"]
+    end
+
+    subgraph API["PhotoShare API — FastAPI (async)"]
+        MW["CORS + TrustedHost middleware"]
+        AUTH["fastapi-users<br/>JWT auth, verify, reset-password"]
+        R["upload / feed / delete routes"]
+        ORM["Async SQLAlchemy 2.0<br/>pooled connections"]
+    end
+
+    PG[("PostgreSQL 16")]
+    IK[("ImageKit CDN")]
+
+    FE --> MW
+    SW --> MW
+    MW --> AUTH
+    MW --> R
+    R -- "upload (threadpool)" --> IK
+    R --> ORM
+    ORM --> PG
+```
 
 ---
 
 ## Tech Stack
 
 **Backend**
-- FastAPI
-- SQLAlchemy (async) + aiosqlite
-- fastapi-users — JWT auth, user management
+- FastAPI (async)
+- SQLAlchemy 2.0 (async) + psycopg v3, PostgreSQL 16
+- Alembic — versioned migrations
+- fastapi-users — JWT auth, registration, email verification, password reset
+- pydantic-settings — every config value from the environment, no hardcoded secrets
 - ImageKit (`imagekitio`) — media storage/CDN
-- uvicorn
+- pytest + pytest-asyncio + httpx — tests against a real Postgres database
 
 **Frontend**
 - Vanilla HTML / CSS / JavaScript (no framework, no build step)
-- Served directly by FastAPI via `StaticFiles`
+- Served directly by FastAPI via `StaticFiles`, same origin as the API
 
-**Tooling**
-- [uv](https://github.com/astral-sh/uv) for dependency management
+**Ops**
+- Docker (multi-stage) + docker-compose (Postgres, healthchecked)
+- GitHub Actions CI — migrations, pytest, ruff on every push/PR
+- Railway deployment (Dockerfile-based, `/health` backs the platform healthcheck)
+
+---
+
+## Key engineering decisions
+
+**Async all the way, except where it can't be.** SQLAlchemy's async engine, fastapi-users' async
+adapters, async route handlers throughout. The one exception is `/upload`: writing the file to disk and
+calling ImageKit's (synchronous) upload API are both blocking calls, so they run via
+`run_in_threadpool` instead of directly in the event loop — otherwise every upload would stall every
+other concurrent request for its full duration.
+
+**No hardcoded secrets.** The JWT/verification/password-reset secret used to be a literal string
+committed to the repo (`SECRET = "ILVUQBJED"`). It's now `pydantic-settings` reading `JWT_SECRET` from
+the environment with no fallback — the app won't boot without it. Note for the record: the old hardcoded
+value is still visible in this repo's git history from before this migration; treat it as permanently
+compromised, not just replaced.
+
+**Ownership is structural, not just checked.** `DELETE /posts/{id}` loads the post, compares
+`post.user_id` against the authenticated user, and 403s on mismatch — before any deletion happens. It's
+a small surface (one mutation route), so the check lives in one place rather than needing a shared
+authorization layer, but the principle is the same one Inventra uses at larger scale: verify ownership
+against the row you're about to touch, not against what the caller claims.
+
+**Migrations instead of `create_all()`.** This app used to call `Base.metadata.create_all()` on every
+startup — fine for a throwaway SQLite file, no upgrade path for a real database. Alembic's initial
+migration was generated against the actual installed `fastapi-users` schema (not hand-typed), specifically
+to avoid guessing at a third-party library's column types.
+
+---
+
+## Quickstart
+
+```bash
+cp .env.example .env   # fill in real ImageKit keys, or leave placeholders if you're not testing upload
+docker compose up --build
+```
+
+Reaches **http://localhost:8000**:
+- `/` — the frontend (login screen and app)
+- `/docs` — interactive Swagger UI
+- `/health` — liveness + DB connectivity check
+
+Migrations run automatically on container start (see `docker-entrypoint.sh`), before `uvicorn` boots.
+
+**Running on the host instead of Docker:**
+
+```bash
+uv sync
+cp .env.example .env
+uv run alembic upgrade head
+uv run main.py
+```
+
+---
+
+## Running the tests
+
+```bash
+uv sync
+cp .env.example .env   # DATABASE_URL just needs to point at a reachable Postgres 16
+uv run pytest -v
+```
+
+The suite creates its own `<database>_pytest` database, runs every Alembic migration against it, and
+drops it when the session ends. Each test runs inside a transaction that's rolled back afterward. Upload
+tests seed `Post` rows directly via the ORM rather than calling the real ImageKit API — not something to
+depend on in CI.
+
+Covers: the auth lifecycle (registration, login, email verification, password reset — tokens are
+captured the way an email template would, since there's no mail service wired up) and ownership-based
+authorization (a non-owner gets `403` on delete, an owner gets `200`).
+
+---
+
+## Deployment
+
+Containerized, deploys to [Railway](https://railway.app) from the Dockerfile directly (see `railway.json`).
+Every required environment variable is documented in [.env.example](.env.example). Short version: create a
+Railway project from this repo, add a PostgreSQL addon, set `DATABASE_URL=${{Postgres.DATABASE_URL}}`,
+`JWT_SECRET`, and the three `IMAGEKIT_*` variables on the api service, deploy — migrations run
+automatically before the app starts. `/health` reports app + database status and backs Railway's own
+healthcheck.
 
 ---
 
 ## Project Structure
 
 ```
-new-project/
+photoshare-api/
 ├── app/
-│   ├── app.py       # FastAPI app instance, routes (upload, feed, delete)
-│   ├── db.py         # SQLAlchemy models (User, Post) + async engine/session
-│   ├── users.py       # fastapi-users setup: JWT backend, UserManager
-│   ├── schemas.py     # Pydantic request/response schemas
-│   └── images.py      # ImageKit client configuration
-├── static/
-│   ├── index.html
-│   ├── style.css
-│   └── script.js
-├── main.py            # Entrypoint — runs uvicorn
-├── pyproject.toml
-└── uv.lock
+│   ├── app.py       # FastAPI app instance, middleware, /health, routes (upload, feed, delete)
+│   ├── config.py    # pydantic-settings; every value documented in .env.example
+│   ├── db.py        # SQLAlchemy models (User, Post) + async engine/session
+│   ├── users.py     # fastapi-users setup: JWT backend, UserManager
+│   ├── schemas.py   # Pydantic request/response schemas
+│   └── images.py    # ImageKit client configuration
+├── alembic/         # migrations (single clean initial revision, generated against the real fastapi-users schema)
+├── static/          # index.html, style.css, script.js
+├── tests/           # pytest suite (see "Running the tests" above)
+├── main.py          # entrypoint — runs uvicorn
+├── Dockerfile, docker-compose.yml, railway.json
+└── .github/workflows/ci.yml
 ```
-
----
-
-## Setup
-
-Requires Python 3.14+ and [uv](https://github.com/astral-sh/uv).
-
-```bash
-uv sync
-```
-
-Create a `.env` file in the project root (see `.env.example`):
-
-```
-IMAGEKIT_PRIVATE_KEY=your_private_key
-IMAGEKIT_PUBLIC_KEY=your_public_key
-IMAGEKIT_URL=https://ik.imagekit.io/your_id
-```
-
-Get these from your [ImageKit dashboard](https://imagekit.io/dashboard).
-
-## Run
-
-```bash
-uv run main.py
-```
-
-Open `http://localhost:8000` for the app, or `http://localhost:8000/docs` for interactive API docs.
 
 ---
 
@@ -122,8 +199,9 @@ Open `http://localhost:8000` for the app, or `http://localhost:8000/docs` for in
 | GET | `/users/{id}` | Get a user by ID |
 | DELETE | `/users/{id}` | Delete a user |
 | POST | `/upload` | Upload an image/video with a caption (auth required) |
-| GET | `/feed` | List all posts, newest first (auth required) |
-| DELETE | `/posts/{post_id}` | Delete a post you own |
+| GET | `/feed` | Paginated feed, newest first, with per-post ownership flags (auth required) |
+| DELETE | `/posts/{post_id}` | Delete a post you own (`403` otherwise) |
+| GET | `/health` | App + database status |
 
 Full interactive documentation is available at `/docs` once the server is running.
 
@@ -136,7 +214,7 @@ User (1) ──< Post (many)
 ```
 
 - `User` — id, email, hashed password, active/verified flags (managed by fastapi-users)
-- `Post` — id, user_id (FK), caption, url, file_type, file_name, created_at
+- `Post` — id, user_id (FK, indexed), caption, url, file_type, file_name, created_at (timezone-aware, indexed)
 
 ---
 

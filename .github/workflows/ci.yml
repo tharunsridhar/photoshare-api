@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: photoshare
+          POSTGRES_PASSWORD: photoshare
+          POSTGRES_DB: photoshare
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U photoshare -d photoshare"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # tests/conftest.py derives its own "photoshare_pytest" DB from this at
+      # test time (create + migrate + drop, once per test session).
+      DATABASE_URL: postgresql+psycopg://photoshare:photoshare@localhost:5432/photoshare
+      JWT_SECRET: ci-test-secret-not-for-production
+      # never actually called - no test hits the real ImageKit API - but
+      # Settings requires these to be present to boot at all.
+      IMAGEKIT_PRIVATE_KEY: ci-placeholder
+      IMAGEKIT_PUBLIC_KEY: ci-placeholder
+      IMAGEKIT_URL: https://ik.imagekit.io/ci-placeholder
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/1
+      CELERY_RESULT_BACKEND: redis://localhost:6379/1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run Alembic migrations
+        run: uv run alembic upgrade head
+
+      - name: Lint with ruff
+        run: uv run ruff check app tests alembic
+
+      - name: Run pytest
+        run: uv run pytest -v
