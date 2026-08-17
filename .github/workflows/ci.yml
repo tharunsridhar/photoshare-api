@@ -35,12 +35,12 @@ jobs:
           --health-retries 10
 
     env:
-      # tests/conftest.py derives its own "photoshare_pytest" DB from this at
-      # test time (create + migrate + drop, once per test session).
-      DATABASE_URL: postgresql+psycopg://photoshare:photoshare@localhost:5432/photoshare
-      JWT_SECRET: ci-test-secret-not-for-production
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      DJANGO_SECRET_KEY: ci-test-secret-not-for-production
+      JWT_SECRET: ci-test-jwt-secret-not-for-production-min-32-bytes
+      DATABASE_URL: postgresql://photoshare:photoshare@localhost:5432/photoshare
       # never actually called - no test hits the real ImageKit API - but
-      # Settings requires these to be present to boot at all.
+      # settings requires these to be present to boot at all.
       IMAGEKIT_PRIVATE_KEY: ci-placeholder
       IMAGEKIT_PUBLIC_KEY: ci-placeholder
       IMAGEKIT_URL: https://ik.imagekit.io/ci-placeholder
@@ -60,11 +60,14 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
-      - name: Run Alembic migrations
-        run: uv run alembic upgrade head
+      - name: Check for missing migrations
+        run: uv run python manage.py makemigrations --check --dry-run
+
+      - name: Run migrations
+        run: uv run python manage.py migrate
 
       - name: Lint with ruff
-        run: uv run ruff check app tests alembic
+        run: uv run ruff check apps config tests manage.py
 
       - name: Run pytest
         run: uv run pytest -v

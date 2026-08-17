@@ -22,4 +22,8 @@ test.db
 
 # test cache
 .pytest_cache/
+.ruff_cache/
+
+# Django
+staticfiles/
 
