@@ -45,7 +45,11 @@ class UploadView(APIView):
         file_obj = request.FILES.get("file")
         if file_obj is None:
             return Response({"detail": "file is required"}, status=status.HTTP_400_BAD_REQUEST)
-        caption = request.data.get("caption", "")
+        # required, not defaulted - the FastAPI port's Form(...) makes caption
+        # mandatory too, and a silent "" here would be a quiet contract change
+        if "caption" not in request.data:
+            return Response({"detail": "caption is required"}, status=status.HTTP_400_BAD_REQUEST)
+        caption = request.data["caption"]
 
         upload_result = imagekit.upload_file(
             file=file_obj,

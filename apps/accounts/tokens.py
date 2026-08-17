@@ -21,7 +21,7 @@ class InvalidTokenError(Exception):
     pass
 
 
-def _password_fingerprint(user) -> str:
+def password_fingerprint(user) -> str:
     return user.password[-16:]
 
 
@@ -34,7 +34,7 @@ def _make_token(user, scope: str, lifetime_seconds: int, bind_password: bool = F
         "exp": now + timedelta(seconds=lifetime_seconds),
     }
     if bind_password:
-        payload["pwd_fp"] = _password_fingerprint(user)
+        payload["pwd_fp"] = password_fingerprint(user)
     return jwt.encode(payload, settings.JWT_SECRET, algorithm="HS256")
 
 
