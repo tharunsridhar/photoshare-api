@@ -6,6 +6,7 @@ Deliberately NOT SQLite - the whole point of the Postgres migration was
 parity between dev/test and prod.
 """
 
+import time
 from collections.abc import AsyncGenerator, Generator
 
 import pytest
@@ -15,7 +16,8 @@ from alembic.config import Config as AlembicConfig
 from fastapi_users.db import SQLAlchemyUserDatabase
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import URL, make_url
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 import app.cache as cache_module
@@ -57,6 +59,30 @@ def test_db_url() -> str:
     return _test_database_url()
 
 
+def _retry_on_operational_error(fn, attempts: int = 15, delay_seconds: float = 2.0):
+    """A fresh postgres:16-alpine container has occasionally rejected
+    connections made shortly after startup with a spurious "password
+    authentication failed" - reproduced locally against the same image with
+    identical credentials (confirmed via container logs: pg_hba.conf matched
+    the correct scram-sha-256 rule and still rejected a password that an
+    otherwise-identical connection accepted seconds later), so it's a
+    transient auth/startup race rather than a real credentials bug. It has
+    shown up on two independent connections in this fixture - the sync admin
+    engine's DROP/CREATE DATABASE, and Alembic's own internal async engine
+    during `command.upgrade()` - so this wraps both rather than just one.
+    Costs nothing when the connection is fine on the first try (the common
+    case) and absorbs the flake when it isn't."""
+    last_error: OperationalError | None = None
+    for attempt in range(attempts):
+        try:
+            return fn()
+        except OperationalError as exc:
+            last_error = exc
+            if attempt < attempts - 1:
+                time.sleep(delay_seconds)
+    raise last_error
+
+
 @pytest.fixture(scope="session")
 def _test_database(test_db_url: str) -> Generator[None, None, None]:
     """Create the test database fresh, run every Alembic migration against
@@ -69,21 +95,21 @@ def _test_database(test_db_url: str) -> Generator[None, None, None]:
     and asyncio.run() cannot be nested inside a running loop. DDL admin work
     doesn't need to be async anyway."""
     target = make_url(test_db_url)
-    admin_url = target.set(database="postgres")
+    admin_url: URL = target.set(database="postgres")
     admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
-    with admin_engine.connect() as conn:
+    with _retry_on_operational_error(admin_engine.connect) as conn:
         conn.execute(text(f'DROP DATABASE IF EXISTS "{target.database}" WITH (FORCE)'))
         conn.execute(text(f'CREATE DATABASE "{target.database}"'))
     admin_engine.dispose()
 
     alembic_cfg = AlembicConfig("alembic.ini")
     alembic_cfg.attributes["sqlalchemy_url"] = test_db_url
-    command.upgrade(alembic_cfg, "head")
+    _retry_on_operational_error(lambda: command.upgrade(alembic_cfg, "head"))
 
     yield
 
     admin_engine = create_engine(admin_url, isolation_level="AUTOCOMMIT")
-    with admin_engine.connect() as conn:
+    with _retry_on_operational_error(admin_engine.connect) as conn:
         conn.execute(text(f'DROP DATABASE IF EXISTS "{target.database}" WITH (FORCE)'))
     admin_engine.dispose()
 

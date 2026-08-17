@@ -105,6 +105,15 @@ startup — fine for a throwaway SQLite file, no upgrade path for a real databas
 migration was generated against the actual installed `fastapi-users` schema (not hand-typed), specifically
 to avoid guessing at a third-party library's column types.
 
+**Retrying, not silencing, a flaky test-database connection.** CI's `postgres:16-alpine` service
+container occasionally rejects a connection made shortly after startup with a spurious "password
+authentication failed" — confirmed via the container's own logs that it matches the correct `pg_hba.conf`
+rule and still rejects a password that an otherwise-identical connection accepts moments later, so it's a
+transient startup race, not a real credentials bug. It showed up on two different connections in
+[`tests/conftest.py`](tests/conftest.py) — the admin engine's `DROP`/`CREATE DATABASE`, and Alembic's own
+internal engine during migration — so both are wrapped in a bounded retry rather than papering over just
+the one that happened to fail first.
+
 **Same-origin frontend, not "CORS elimination."** The frontend is served same-origin via FastAPI's
 `StaticFiles`, so the demo's own UI never triggers a CORS preflight. Worth stating precisely: this
 doesn't eliminate CORS as a concern — the `CORS + TrustedHost middleware` in the architecture diagram is
